@@ -1,0 +1,47 @@
+{
+	"name": "ghc-import",
+	"label": "GHC import",
+	"description": "Import dicom files from Google Healthcare API",
+	"version": "0.1",
+	"flywheel": "0",
+	"inputs": {
+		"key": {
+			"base": "api-key"
+		}
+	},
+	"config": {
+		"series": {
+			"description": "Dicom series to import. studyid/seriesid",
+			"items": {
+				"type": "string"
+			},
+			"type": "array"
+		},
+		"project": {
+			"description": "Google project id",
+			"type": "string"
+		},
+		"location": {
+			"description": "Data location eg. us-central1",
+			"type": "string"
+		},
+		"dataset": {
+			"description": "Google Healtcare dataset",
+			"type": "string"
+		},
+		"dicomstore": {
+			"description": "Google Healtcare Dicom store",
+			"type": "string"
+		}
+	},
+	"author": "David Farkas",
+	"maintainer": "David Farkas",
+	"license": "Other",
+	"source": "https://github.com/flywheel-apps/ghc-import",
+	"url": "https://github.com/flywheel-apps/ghc-import",
+	"custom": {
+		"gear-builder": {
+			"image": "ghc-import"
+		}
+	}
+}
