@@ -2,7 +2,7 @@
 	"name": "ghc-import",
 	"label": "GHC import",
 	"description": "Import dicom files from Google Healthcare API",
-	"version": "0.1",
+	"version": "0.2",
 	"flywheel": "0",
 	"inputs": {
 		"key": {
@@ -10,12 +10,17 @@
 		}
 	},
 	"config": {
-		"series": {
-			"description": "Dicom series to import. studyid/seriesid",
+		"uids": {
+			"description": "Import studies/series with these uids",
 			"items": {
 				"type": "string"
 			},
 			"type": "array"
+		},
+		"level": {
+			"description": "Import level studies/series",
+			"type": "string",
+			"default": "series"
 		},
 		"project": {
 			"description": "Google project id",
@@ -32,6 +37,11 @@
 		"dicomstore": {
 			"description": "Google Healtcare Dicom store",
 			"type": "string"
+		},
+		"log-level": {
+			"description": "Log level, the usual DEBUG, WARNING, INFO etc.",
+			"type": "string",
+			"default": "INFO"
 		}
 	},
 	"author": "David Farkas",

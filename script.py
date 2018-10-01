@@ -14,11 +14,9 @@ from dicomweb_client.api import DICOMwebClient
 from flywheel_migration.dcm import DicomFile, DicomFileError
 
 logging.basicConfig(
-    format='%(asctime)s %(name)16.16s %(filename)24.24s %(lineno)5d:%(levelname)4.4s %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.DEBUG,
+    format='%(asctime)s %(filename)12.12s %(lineno)5d:%(levelname)5.5s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
-logging.getLogger('urllib3').setLevel(logging.WARNING) # silence urllib3 library
 
 log = logging.getLogger()
 
@@ -59,10 +57,12 @@ def main():
     with open('/flywheel/v0/config.json') as f:
         config = json.load(f)
 
+    log.setLevel(logging.getLevelName(config['config']['log-level']))
+
     parts = config['inputs']['key']['key'].split(':')
     api_key = parts[-1]
     api_uri = ':'.join(parts[:-1])
-    log.debug('Using: %s', api_uri)
+    log.debug('Using API: %s', api_uri)
 
     if not api_uri.startswith('http'):
         api_uri = 'https://' + api_uri
@@ -72,12 +72,19 @@ def main():
 
     # get google token for healthcare api requests
     resp = session.get(api_uri + '/api/ghc/token')
+    if resp.status_code != 200:
+        log.debug(resp.json())
+        log.error('Couldn\'t get token from api for GHC')
+        exit(1)
+
     ghc_token = resp.json()['token']
 
     project_id = config['config']['project']
     location = config['config']['location']
     dataset = config['config']['dataset']
     dicomstore = config['config']['dicomstore']
+
+    log.debug('Using %s/%s/%s/%s' % (project_id, location, dataset, dicomstore))
 
     client = DICOMwebClient(
         url="https://healthcare.googleapis.com/v1alpha/projects/{project_id}/"
@@ -93,16 +100,35 @@ def main():
             )
     )
 
-    for s in config['config']['series']:
+    log.debug('Import level is %s', config['config']['level'])
+
+    for uid in config['config']['uids']:
         with tempfile.TemporaryDirectory() as tempdir:
-            state, metadata_map = reap(s, tempdir, client)
-            if state == 'reaped':
-                for filepath, metadata in sorted(metadata_map.iteritems()):
-                    upload(filepath, metadata, session, api_uri)
+
+            if config['config']['level'] == 'series':
+                found_series = client.search_for_series(search_filters={
+                    'SeriesInstanceUID': uid
+                })
+            else:
+                found_series = client.search_for_series(search_filters={
+                    'StudyInstanceUID': uid
+                })
+
+            if len(found_series) == 0:
+                log.error('No series found to import, %s uid was: %s' % (config['config']['level'], uid))
+                exit(1)
+
+            for series in found_series:
+                if config['config']['level'] == 'series':
+                    state, metadata_map = reap(series['0020000D']['Value'][0], uid, tempdir, client)
+                else:
+                    state, metadata_map = reap(uid, series['0020000E']['Value'][0], tempdir, client)
+                if state == 'reaped':
+                    for filepath, metadata in sorted(metadata_map.iteritems()):
+                        upload(filepath, metadata, session, api_uri)
 
 
-def reap(item, tempdir, dicom_client):
-    study, series = item.split('/')
+def reap(study, series, tempdir, dicom_client):
     log.info('Downloading %s/%s', study, series)
     dicoms = dicom_client.retrieve_series(study, series)
 
@@ -113,9 +139,8 @@ def reap(item, tempdir, dicom_client):
     series_cnt = len(dicom_series)
     metadata_map = {}
     for series_num, series_uid in enumerate(dicom_series):
-        log.info('Reaping      %s (%s/%s)', series_uid, series_num, series_cnt)
+        log.info('Reaping      %s (%s/%s)', series_uid, series_num+1, series_cnt)
 
-        start = datetime.datetime.utcnow()
         reapdir = os.path.join(tempdir, series_uid)
         series = dicom_series[series_uid]
         os.mkdir(reapdir)
@@ -154,7 +179,7 @@ def upload(filepath, metadata, http_session, url):
         except requests.HTTPError as r:
             log.exception(r)
             return False
-    log.debug('Uploaded     %s [%s/s]', filename, hrsize(os.path.getsize(filepath) / duration))
+    log.info('Uploaded     %s [%s/s]', filename, hrsize(os.path.getsize(filepath) / duration))
     return True
 
 
@@ -197,7 +222,7 @@ def pkg_series(path, arcname='default', **kwargs):
         shutil.rmtree(arcdir_path)
         metadata_map[arc_path] = metadata
     duration = (datetime.datetime.utcnow() - start).total_seconds()
-    log.debug('Compressed   %s, %d images in %.1fs [%.0f/s]', file_cnt, duration, file_cnt / duration)
+    log.debug('Compressed %d images in %.1fs [%.0f/s]', file_cnt, duration, file_cnt / duration)
     return metadata_map
 
 
