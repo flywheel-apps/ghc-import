@@ -2,7 +2,7 @@
 	"name": "ghc-import",
 	"label": "GHC import",
 	"description": "Import dicom files from Google Healthcare API",
-	"version": "0.2",
+	"version": "0.2.7",
 	"flywheel": "0",
 	"inputs": {
 		"key": {
@@ -10,36 +10,37 @@
 		}
 	},
 	"config": {
+		"dicomweb_uri": {
+			"description": "DICOMWeb API URL",
+			"type": "string"
+		},
 		"uids": {
-			"description": "Import studies/series with these uids",
+			"description": "List of Study/Series UIDs to import",
 			"items": {
 				"type": "string"
 			},
 			"type": "array"
 		},
-		"level": {
-			"description": "Import level studies/series",
+		"uid_field": {
+			"description": "UID field to search on (Study/SeriesInstanceUID)",
 			"type": "string",
-			"default": "series"
+			"default": "SeriesInstanceUID"
 		},
-		"project": {
-			"description": "Google project id",
+		"de_identify": {
+			"description": "De-identify dicoms before import",
+			"type": "boolean",
+			"default": false
+		},
+		"group_id": {
+			"description": "Flywheel group id to import into",
 			"type": "string"
 		},
-		"location": {
-			"description": "Data location eg. us-central1",
+		"project_label": {
+			"description": "Flywheel project label to import into",
 			"type": "string"
 		},
-		"dataset": {
-			"description": "Google Healtcare dataset",
-			"type": "string"
-		},
-		"dicomstore": {
-			"description": "Google Healtcare Dicom store",
-			"type": "string"
-		},
-		"log-level": {
-			"description": "Log level, the usual DEBUG, WARNING, INFO etc.",
+		"log_level": {
+			"description": "Log verbosity level (ERROR|WARNING|INFO|DEBUG)",
 			"type": "string",
 			"default": "INFO"
 		}

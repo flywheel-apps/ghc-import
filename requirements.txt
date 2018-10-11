@@ -1,5 +1,6 @@
 backports.tempfile
-git+https://github.com/flywheel-io/dicomweb-client@query-params
-tzlocal
-requests-toolbelt
 flywheel-migration
+requests-toolbelt
+tzlocal
+
+git+https://github.com/flywheel-io/dicomweb-client@session-attrs
