@@ -73,8 +73,19 @@ def main(config_json=None):
                     filename = os.path.basename(filepath)
                     with open(filepath, 'rb') as f:
                         mpe = MultipartEncoder(fields={'metadata': metadata_json, 'file': (filename, f)})
-                        r = api.post(api_uri + '/api/upload/uid', data=mpe, headers={'Content-Type': mpe.content_type})
-                    r.raise_for_status()
+                        resp = api.post(api_uri + '/api/upload/uid', data=mpe, headers={'Content-Type': mpe.content_type})
+                    if not resp.ok:
+                        req = resp.request
+                        log.error('%s %s -> %s %s', req.method, req.url, resp.status_code, resp.reason)
+                        try:
+                            error = json.loads(resp.content, object_hook=byteify)
+                            if 'message' in error:
+                                # Remove unicode artifacts (u'') and JSON schema dumps (keep 1st line only)
+                                error['message'] = error['message'].replace("u'", "'").split('\n')[0]
+                            error_str = pprint.pformat(error)
+                        except ValueError:
+                            error_str = resp.content
+                        log.error('Response\n%s' if '\n' in error_str else 'Response: %s', error_str)
 
 
 def pkg_series(path, **kwargs):
@@ -106,7 +117,7 @@ def get_metadata(dcm):
     metadata = {}
     for group in ('subject', 'session', 'acquisition'):
         prefix = group + '_'
-        group_attrs = [attr for attr in dir(dcm) if attr.startswith(prefix)]
+        group_attrs = [attr for attr in dir(dcm) if attr.startswith(prefix) and getattr(dcm, attr)]
         metadata[group] = {k.replace(prefix, ''): getattr(dcm, k) for k in group_attrs}
     metadata['session']['subject'] = metadata.pop('subject')
     return metadata
@@ -137,6 +148,16 @@ def metadata_encoder(obj):
     elif isinstance(obj, datetime.tzinfo):
         return obj.zone
     raise TypeError(repr(obj) + ' is not JSON serializable')
+
+
+def byteify(data):
+    if isinstance(data, unicode):
+        return data.encode('utf-8')
+    if isinstance(data, list):
+        return [byteify(item) for item in data]
+    if isinstance(data, dict):
+        return {byteify(key): byteify(value) for key, value in data.iteritems()}
+    return data
 
 
 if __name__ == '__main__':
