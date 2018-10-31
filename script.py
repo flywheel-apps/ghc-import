@@ -38,7 +38,7 @@ def main(config_json=None):
     api = requests.session()
     api.headers.update({'Authorization': 'scitran-user ' + api_key})
 
-    dicomweb_token = config.get('token') or api.get(api_uri + '/api/ghc/token').json()['token']
+    dicomweb_token = config.get('token') or api.get(api_uri + '/api/gcp/token').json()['token']
     dicomweb = DICOMwebClient(url=config['dicomweb_uri'], headers={'Authorization': 'Bearer ' + dicomweb_token})
 
     for uid in config['uids']:
