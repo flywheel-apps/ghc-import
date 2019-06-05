@@ -2,7 +2,7 @@
 	"name": "ghc-import",
 	"label": "GHC import",
 	"description": "Import dicoms from Google Healthcare API",
-	"version": "0.4.21",
+	"version": "0.5.0",
 	"flywheel": "0",
 	"inputs": {
 		"key": {
