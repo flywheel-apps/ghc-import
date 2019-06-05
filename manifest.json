@@ -1,8 +1,8 @@
 {
 	"name": "ghc-import",
 	"label": "GHC import",
-	"description": "Import dicom files from Google Healthcare API",
-	"version": "0.2.9",
+	"description": "Import dicoms from Google Healthcare API",
+	"version": "0.4.21",
 	"flywheel": "0",
 	"inputs": {
 		"key": {
@@ -10,33 +10,56 @@
 		}
 	},
 	"config": {
-		"dicomweb_uri": {
-			"description": "DICOMWeb API URL",
+		"auth_token_id": {
+			"description": "GCP auth token id",
 			"type": "string"
 		},
+		"hc_dicomstore": {
+			"description": "Healthcare API dicom store",
+			"type": "string",
+			"optional": true
+		},
+		"hc_hl7store": {
+			"description": "Healthcare API HL7 store",
+			"type": "string",
+			"optional": true
+		},
+		"hc_fhirstore": {
+			"description": "Healthcare API FHIR store",
+			"type": "string",
+			"optional": true
+		},
 		"uids": {
-			"description": "List of Study/Series UIDs to import",
+			"description": "List of Study/SeriesInstanceUIDs to import",
 			"items": {
 				"type": "string"
 			},
-			"type": "array"
+			"type": "array",
+			"default": []
 		},
-		"uid_field": {
-			"description": "UID field to search on (Study/SeriesInstanceUID)",
-			"type": "string",
-			"default": "SeriesInstanceUID"
+		"hl7_msg_ids": {
+			"description": "HL7 message IDs to import",
+			"items": {
+				"type": "string"
+			},
+			"type": "array",
+			"default": []
+		},
+		"fhir_resource_refs": {
+			"description": "FHIR resource references resource_type/id",
+			"items": {
+				"type": "string"
+			},
+			"type": "array",
+			"default": []
 		},
 		"de_identify": {
-			"description": "De-identify dicoms before import",
+			"description": "De-identify DICOMs before import",
 			"type": "boolean",
 			"default": false
 		},
-		"group_id": {
-			"description": "Flywheel group id to import into",
-			"type": "string"
-		},
-		"project_label": {
-			"description": "Flywheel project label to import into",
+		"project_id": {
+			"description": "Destination Flywheel project",
 			"type": "string"
 		},
 		"log_level": {
@@ -50,6 +73,7 @@
 	"license": "Other",
 	"source": "https://github.com/flywheel-apps/ghc-import",
 	"url": "https://github.com/flywheel-apps/ghc-import",
+	"command": "python run.py",
 	"custom": {
 		"gear-builder": {
 			"image": "ghc-import"

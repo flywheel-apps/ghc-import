@@ -1,6 +1,9 @@
 backports.tempfile
 flywheel-migration
+pydicom
+pytz
+pyyaml
+requests
 requests-toolbelt
 tzlocal
-
-git+https://github.com/flywheel-io/dicomweb-client@session-attrs
+git+https://github.com/flywheel-io/healthcare-api@develop
