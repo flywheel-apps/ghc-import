@@ -1,7 +1,7 @@
 {
 	"name": "ghc-import",
 	"label": "GHC import",
-	"description": "Import dicoms from Google Healthcare API",
+	"description": "Import DICOMs from Google Healthcare API",
 	"version": "0.5.1",
 	"flywheel": "0",
 	"inputs": {
@@ -30,7 +30,7 @@
 		},
 		"hc_dicomstore": {
 			"default": "",
-			"description": "Healthcare API dicom store",
+			"description": "Healthcare API DICOM store",
 			"type": "string"
 		},
 		"hc_fhirstore": {
@@ -62,8 +62,7 @@
 	"custom": {
 		"gear-builder": {
 			"category": "importer",
-			"container": "24b35b94a775be7db120749940ea7a57bd17bec5f70dde55ff0cd6953c732159",
-			"image": "gear-builder-rsnkwdikmg-20190625121434"
+			"image": "ghc-import"
 		}
 	}
 }

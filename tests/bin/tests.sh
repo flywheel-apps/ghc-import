@@ -8,12 +8,9 @@ cd "$( dirname $0 )/../.."
 USAGE="
 Usage:
     $0 [OPTION...] [[--] PYTEST_ARGS...]
-Runs all tests and linting.
-Assumes running in test container or that flywheel_migration and all of its
-dependencies are installed.
+Runs all tests.
 Options:
     -h, --help              Print this help and exit
-    -s, --shell             Enter shell instead of running tests
     -- PYTEST_ARGS          Arguments passed to py.test
 "
 
@@ -27,10 +24,6 @@ main() {
             -h|--help)
                 log "$USAGE"
                 exit 0
-                ;;
-            -s|--shell)
-                sh
-                exit
                 ;;
             --)
                 shift

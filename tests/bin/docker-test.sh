@@ -9,7 +9,7 @@ Usage:
 Run tests in a docker container.
 Options:
     -h, --help      Print this help and exit
-    -B, --no-build      Skip building reaper image
+    -B, --no-build      Skip building docker image
     -- TEST_ARGS    Arguments passed to tests.sh
 "
 
