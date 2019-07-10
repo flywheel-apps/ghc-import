@@ -1,5 +1,6 @@
 backports.tempfile
 flywheel-migration
+flywheel-sdk
 pydicom
 pytz
 pyyaml

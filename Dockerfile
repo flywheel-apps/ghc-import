@@ -1,4 +1,4 @@
-FROM python:3.7.1-alpine3.8
+FROM python:3.7.4-alpine3.10 as base
 
 RUN apk add --no-cache bash git \
     && rm -rf /var/cache/apk/*
@@ -12,3 +12,6 @@ RUN pip3 install -r requirements.txt \
 COPY . .
 
 ENTRYPOINT ["/flywheel/v0/run.py"]
+
+FROM base as testing
+RUN pip install -r tests/requirements.txt

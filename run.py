@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import base64
 import copy
 import csv
@@ -11,11 +13,12 @@ import sys
 import tempfile
 import zipfile
 import re
-
+import flywheel
 import dateutil.parser
 from healthcare_api.client import Client as HealthcareAPIClient
 import pytz
 import requests
+from urllib.parse import urljoin
 from dicomweb_client.api import load_json_dataset
 from flywheel_migration.dcm import DicomFile
 from flywheel_migration.util import DEFAULT_TZ
@@ -38,12 +41,8 @@ HL7_ETHNIC_GROUP_MAP = {
 }
 
 
-def main(config_json=None):
-    if config_json is None:
-        # passing config_json enabled for development - read from file in prod
-        config_json = json.load(open('/flywheel/v0/config.json'))
-    inputs = config_json['inputs']
-    config = config_json['config']
+def main(context):
+    config = context.config
     logging.basicConfig(
         format='%(asctime)s %(name)15.15s %(levelname)4.4s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
@@ -52,48 +51,49 @@ def main(config_json=None):
     )
     log.setLevel(getattr(logging, config['log_level']))
 
-    log.debug('config.json\n%s', pprint.pformat(config_json))
+    log.debug('config.json\n%s', pprint.pformat(config))
 
-    api_key = inputs['key']['key']
+    api_key = context.get_input('key')['key']
 
     if 'docker.local.flywheel.io' in api_key:
         # dev workaround for accessing docker.local - set own host ip
         # ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'
-        host_ip = '192.168.50.189'
+        host_ip = '192.168.50.162'
         with open('/etc/hosts', 'a') as f:
             f.write(host_ip + '\tdocker.local.flywheel.io\n')
-
     api_uri = api_key.rsplit(':', 1)[0]
     if not api_uri.startswith('http'):
         api_uri = 'https://' + api_uri + '/api'
-    api = requests.session()
-    api.headers.update({'Authorization': 'scitran-user ' + api_key})
+    fw_api = FwApi(api_uri)
+    fw_api.headers.update({'Authorization': 'scitran-user ' + api_key})
 
     # validate destination project exists
-    resp = api.get(api_uri + '/projects/' + config['project_id'])
+    resp = fw_api.get('projects/' + config['project_id'])
     resp.raise_for_status()
     proj = resp.json()
 
-    resp = api.get(api_uri + '/users/self/tokens/' + config['auth_token_id'])
+    resp = fw_api.get('users/self/tokens/' + config['auth_token_id'])
     resp.raise_for_status()
     access_token = resp.json()['access_token']
-
-    if config.get('uids'):
-        import_dicom_files(access_token, config, proj, api, api_uri)
-
-    if config.get('hl7_msg_ids'):
-        import_hl7_messages(access_token, config, proj, api, api_uri)
-
-    if config.get('fhir_resource_refs'):
-        import_fhir_resources(access_token, config, proj, api, api_uri)
-
-
-def import_dicom_files(access_token, config, project, api, api_uri):
-    log.info('Importing DICOM files...')
     hc_api = HealthcareAPIClient(access_token)
-    dicomweb = hc_api.get_dicomweb_client(config['hc_dicomstore'])
 
-    for study_uid, series_uid in search_uids(dicomweb, config['uids']):
+    with context.open_input('import_ids', 'r') as input_file:
+        import_ids = json.load(input_file)
+
+    if import_ids.get('dicoms'):
+        import_dicom_files(hc_api, config['hc_dicomstore'], import_ids['dicoms'], fw_api, proj, config.get('de_identify', False))
+
+    if import_ids.get('hl7s'):
+        import_hl7_messages(hc_api, config['hc_hl7store'], import_ids['hl7s'], fw_api, proj)
+
+    if import_ids.get('fhirs'):
+        import_fhir_resources(hc_api, config['hc_fhirstore'], import_ids['fhirs'], fw_api, proj)
+
+def import_dicom_files(hc_api, hc_dicomstore, dcm_ids, fw_api, fw_project, de_identify=False):
+    log.info('Importing DICOM files...')
+    dicomweb = hc_api.get_dicomweb_client(hc_dicomstore)
+
+    for study_uid, series_uid in search_uids(dicomweb, dcm_ids):
         log.info('  Processing series %s', series_uid)
         with tempfile.TemporaryDirectory() as tempdir:
             series_dir = os.path.join(tempdir, series_uid)
@@ -103,7 +103,7 @@ def import_dicom_files(access_token, config, project, api, api_uri):
                 dicom.save_as(os.path.join(series_dir, dicom.SOPInstanceUID))
 
             log.debug('     Packing...')
-            metadata_map = pkg_series(series_dir, de_identify=config.get('de_identify', False), timezone=DEFAULT_TZ, map_key='PatientID')
+            metadata_map = pkg_series(series_dir, de_identify=de_identify, timezone=DEFAULT_TZ, map_key='PatientID')
 
             log.debug('     Uploading...')
             for filepath, metadata in sorted(metadata_map.items()):
@@ -112,11 +112,11 @@ def import_dicom_files(access_token, config, project, api, api_uri):
                     'use_patient_id': True
                 }
                 del metadata['patient_id']
-                master_subject_code = get_master_subject_code(subj_code_payload, api, api_uri)
-                subject = get_subject_by_master_code(master_subject_code, project, api, api_uri)
+                master_subject_code = get_master_subject_code(subj_code_payload, fw_api)
+                subject = get_subject_by_master_code(master_subject_code, fw_project, fw_api)
 
-                metadata.setdefault('group', {})['_id'] = project['group']
-                metadata.setdefault('project', {})['label'] = project['label']
+                metadata.setdefault('group', {})['_id'] = fw_project['group']
+                metadata.setdefault('project', {})['label'] = fw_project['label']
                 subject_info = copy.deepcopy(metadata['session']['subject'])
                 metadata['session']['subject'] = {'master_code': master_subject_code}
 
@@ -129,17 +129,15 @@ def import_dicom_files(access_token, config, project, api, api_uri):
                 filename = os.path.basename(filepath)
                 with open(filepath, 'rb') as f:
                     mpe = MultipartEncoder(fields={'metadata': metadata_json, 'file': (filename, f)})
-                    resp = api.post(api_uri + '/upload/uid', data=mpe, headers={'Content-Type': mpe.content_type})
+                    resp = fw_api.post('upload/uid', data=mpe, headers={'Content-Type': mpe.content_type})
                     resp.raise_for_status()
 
 
-def import_hl7_messages(access_token, config, project, api, api_uri):
+def import_hl7_messages(hc_api, hc_hl7store, hl7_ids, fw_api, fw_project):
     log.info('Importing HL7 messages...')
-    hc_api = HealthcareAPIClient(access_token)
-
-    for msg_id in config['hl7_msg_ids']:
+    for msg_id in hl7_ids:
         log.info('  Processing HL7 message %s', msg_id)
-        msg = hc_api.get_hl7v2_message('{}/messages/{}'.format(config['hc_hl7store'], msg_id))
+        msg = hc_api.get_hl7v2_message('{}/messages/{}'.format(hc_hl7store, msg_id))
 
         log.debug('     Creating metadata...')
         msg_obj = HL7Message(msg)
@@ -152,15 +150,15 @@ def import_hl7_messages(access_token, config, project, api, api_uri):
             'use_patient_id': bool(msg_obj.patient_id)
         }
 
-        master_subject_code = get_master_subject_code(subj_code_payload, api, api_uri)
-        subject = get_subject_by_master_code(master_subject_code, project, api, api_uri)
+        master_subject_code = get_master_subject_code(subj_code_payload, fw_api)
+        subject = get_subject_by_master_code(master_subject_code, fw_project, fw_api)
 
         file_meta = normalize_dict_keys(copy.deepcopy(msg))
         del file_meta['data']
 
         metadata = get_metadata(msg_obj)
-        metadata.setdefault('group', {})['_id'] = project['group']
-        metadata.setdefault('project', {})['label'] = project['label']
+        metadata.setdefault('group', {})['_id'] = fw_project['group']
+        metadata.setdefault('project', {})['label'] = fw_project['label']
         subject_info = copy.deepcopy(metadata['session']['subject'])
         metadata['session']['subject'] = {'master_code': master_subject_code}
         metadata['acquisition']['files'] = [
@@ -181,21 +179,19 @@ def import_hl7_messages(access_token, config, project, api, api_uri):
         metadata_json = json.dumps(metadata, default=metadata_encoder)
         raw_hl7_msg = base64.b64decode(msg['data'])
         mpe = MultipartEncoder(fields={'metadata': metadata_json, 'file': (msg_obj.msg_control_id + '.hl7.txt', raw_hl7_msg)})
-        resp = api.post(api_uri + '/upload/label', data=mpe, headers={'Content-Type': mpe.content_type})
+        resp = fw_api.post('upload/label', data=mpe, headers={'Content-Type': mpe.content_type})
         log.debug('     Upload response:\n%s', pprint.pformat(resp.json()))
         resp.raise_for_status()
 
 
-def import_fhir_resources(access_token, config, project, api, api_uri):
+def import_fhir_resources(hc_api, hc_fhirstore, fhir_refs, fw_api, fw_project):
     log.info('Importing FHIR resources...')
-    hc_api = HealthcareAPIClient(access_token)
-
-    for resource_ref in config['fhir_resource_refs']:
+    for resource_ref in fhir_refs:
         resource_type, resource_id = resource_ref.split('/')
-        resource = hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(config['hc_fhirstore'], resource_type, resource_id))
+        resource = hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(hc_fhirstore, resource_type, resource_id))
 
         log.debug('     Creating metadata...')
-        resource_obj = FHIRResource(resource, hc_api, config)
+        resource_obj = FHIRResource(resource, hc_api, hc_fhirstore)
 
         subj_code_payload = {
             'patient_id': resource_obj.patient_id,
@@ -205,14 +201,14 @@ def import_fhir_resources(access_token, config, project, api, api_uri):
             'use_patient_id': bool(resource_obj.patient_id)
         }
 
-        master_subject_code = get_master_subject_code(subj_code_payload, api, api_uri)
+        master_subject_code = get_master_subject_code(subj_code_payload, fw_api)
 
         log.debug(master_subject_code)
-        subject = get_subject_by_master_code(master_subject_code, project, api, api_uri)
+        subject = get_subject_by_master_code(master_subject_code, fw_project, fw_api)
 
         metadata = get_metadata(resource_obj)
-        metadata.setdefault('group', {})['_id'] = project['group']
-        metadata.setdefault('project', {})['label'] = project['label']
+        metadata.setdefault('group', {})['_id'] = fw_project['group']
+        metadata.setdefault('project', {})['label'] = fw_project['label']
         subject_info = copy.deepcopy(metadata['session']['subject'])
         metadata['session']['subject'] = {'master_code': master_subject_code}
         collection = metadata['session']['subject'] if resource_type == 'Patient' else metadata['session'] if resource_type == 'Encounter' else metadata['acquisition']
@@ -238,24 +234,24 @@ def import_fhir_resources(access_token, config, project, api, api_uri):
         metadata_json = json.dumps(metadata, default=metadata_encoder)
         msg_json = json.dumps(resource, sort_keys=True, indent=4, default=metadata_encoder)
         mpe = MultipartEncoder(fields={'metadata': metadata_json, 'file': (filename + '.fhir.json', msg_json)})
-        resp = api.post(api_uri + '/upload/label', data=mpe, headers={'Content-Type': mpe.content_type})
+        resp = fw_api.post('upload/label', data=mpe, headers={'Content-Type': mpe.content_type})
         log.debug('     Upload response:\n%s', pprint.pformat(resp.json()))
         resp.raise_for_status()
 
 
-def get_master_subject_code(payload, api, api_uri):
+def get_master_subject_code(payload, fw_api):
     payload_json = json.dumps(payload, default=metadata_encoder)
     log.debug('  Master subject code payload:\n%s', pprint.pformat(payload))
-    resp = api.post(api_uri + '/subjects/master-code', data=payload_json)
+    resp = fw_api.post('subjects/master-code', data=payload_json)
     log.debug('  Master subject code response:\n%s', pprint.pformat(resp.json()))
     resp.raise_for_status()
     return resp.json()['code']
 
 
-def get_subject_by_master_code(code, project, api, api_uri):
-    resp = api.get(api_uri + '/subjects')
+def get_subject_by_master_code(code, fw_project, fw_api):
+    resp = fw_api.get('subjects')
     resp.raise_for_status()
-    matching_subjects = [s for s in resp.json() if s.get('master_code') == code and s['project'] == project['_id']]
+    matching_subjects = [s for s in resp.json() if s.get('master_code') == code and s['project'] == fw_project['_id']]
 
     if len(matching_subjects) > 1:
         raise Exception("Too many matching study, can't decide what to do")
@@ -352,6 +348,16 @@ def metadata_encoder(obj):
     raise TypeError(repr(obj) + ' is not JSON serializable')
 
 
+class FwApi(requests.Session):
+    def __init__(self, base_url=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.base_url = base_url.rstrip('/') + '/'
+
+    def request(self, method, url, *args, **kwargs):
+        url = urljoin(self.base_url, url)
+        return super().request(method, url, *args, **kwargs)
+
+
 class HL7Message:
     def __init__(self, hc_api_msg):
         self.msg_json = hc_api_msg
@@ -387,7 +393,7 @@ class HL7Message:
 
 
 class FHIRResource:
-    def __init__(self, resource, hc_api, config):
+    def __init__(self, resource, hc_api, hc_fhirstore):
         self.raw = resource
         self.type = self.raw['resourceType']
         self.last_updated = dateutil.parser.parse(self.raw['meta']['lastUpdated'])
@@ -410,9 +416,9 @@ class FHIRResource:
             else:
                 patient_id = subject_ref.split('/')[1]
                 patient = FHIRResource(
-                    hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(config['hc_fhirstore'], 'Patient', patient_id)),
+                    hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(hc_fhirstore, 'Patient', patient_id)),
                     hc_api,
-                    config
+                    hc_fhirstore
                 )
 
         self.patient_id = patient.get_id() if patient else None
@@ -485,4 +491,7 @@ class FHIRResource:
 
 
 if __name__ == '__main__':
-    main()
+    with flywheel.GearContext() as context:
+        context.init_logging()
+        context.log_config()
+        main(context)

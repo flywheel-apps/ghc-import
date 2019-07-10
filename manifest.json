@@ -2,9 +2,18 @@
 	"name": "ghc-import",
 	"label": "GHC import",
 	"description": "Import dicoms from Google Healthcare API",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"flywheel": "0",
 	"inputs": {
+		"import_ids": {
+			"base": "file",
+			"description": "JSON file optionally containing uids, HL7 Message IDs hl7_msg_ids, fhir_resource_refs",
+			"type": {
+				"enum": [
+					"json"
+				]
+			}
+		},
 		"key": {
 			"base": "api-key"
 		}
@@ -14,69 +23,47 @@
 			"description": "GCP auth token id",
 			"type": "string"
 		},
-		"hc_dicomstore": {
-			"description": "Healthcare API dicom store",
-			"type": "string",
-			"optional": true
+		"de_identify": {
+			"default": false,
+			"description": "De-identify DICOMs before import",
+			"type": "boolean"
 		},
-		"hc_hl7store": {
-			"description": "Healthcare API HL7 store",
-			"type": "string",
-			"optional": true
+		"hc_dicomstore": {
+			"default": "",
+			"description": "Healthcare API dicom store",
+			"type": "string"
 		},
 		"hc_fhirstore": {
+			"default": "",
 			"description": "Healthcare API FHIR store",
-			"type": "string",
-			"optional": true
+			"type": "string"
 		},
-		"uids": {
-			"description": "List of Study/SeriesInstanceUIDs to import",
-			"items": {
-				"type": "string"
-			},
-			"type": "array",
-			"default": []
+		"hc_hl7store": {
+			"default": "",
+			"description": "Healthcare API HL7 store",
+			"type": "string"
 		},
-		"hl7_msg_ids": {
-			"description": "HL7 message IDs to import",
-			"items": {
-				"type": "string"
-			},
-			"type": "array",
-			"default": []
-		},
-		"fhir_resource_refs": {
-			"description": "FHIR resource references resource_type/id",
-			"items": {
-				"type": "string"
-			},
-			"type": "array",
-			"default": []
-		},
-		"de_identify": {
-			"description": "De-identify DICOMs before import",
-			"type": "boolean",
-			"default": false
+		"log_level": {
+			"default": "INFO",
+			"description": "Log verbosity level (ERROR|WARNING|INFO|DEBUG)",
+			"type": "string"
 		},
 		"project_id": {
 			"description": "Destination Flywheel project",
 			"type": "string"
-		},
-		"log_level": {
-			"description": "Log verbosity level (ERROR|WARNING|INFO|DEBUG)",
-			"type": "string",
-			"default": "INFO"
 		}
 	},
+	"command": "./run.py",
 	"author": "David Farkas",
 	"maintainer": "David Farkas",
 	"license": "Other",
 	"source": "https://github.com/flywheel-apps/ghc-import",
 	"url": "https://github.com/flywheel-apps/ghc-import",
-	"command": "python run.py",
 	"custom": {
 		"gear-builder": {
-			"image": "ghc-import"
+			"category": "importer",
+			"container": "24b35b94a775be7db120749940ea7a57bd17bec5f70dde55ff0cd6953c732159",
+			"image": "gear-builder-rsnkwdikmg-20190625121434"
 		}
 	}
 }
