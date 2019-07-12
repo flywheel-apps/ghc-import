@@ -1,8 +1,8 @@
 **
 
-!script.py
-!requirements.txt
-!manifest.json
 !LoincTableCore.csv
+!manifest.json
+!requirements.txt
 !run.py
+!test-requirements.txt
 !tests

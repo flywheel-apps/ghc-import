@@ -4,25 +4,25 @@ import base64
 import copy
 import csv
 import datetime
+import dateutil.parser
+import flywheel
 import json
 import logging
 import os
 import pprint
+import pytz
+import re
+import requests
 import shutil
 import sys
 import tempfile
 import zipfile
-import re
-import flywheel
-import dateutil.parser
-from healthcare_api.client import Client as HealthcareAPIClient
-import pytz
-import requests
-from urllib.parse import urljoin
 from dicomweb_client.api import load_json_dataset
 from flywheel_migration.dcm import DicomFile
 from flywheel_migration.util import DEFAULT_TZ
+from healthcare_api.client import Client as HealthcareAPIClient
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+from urllib.parse import urljoin
 
 log = logging.getLogger('ghc_import')
 
@@ -43,12 +43,7 @@ HL7_ETHNIC_GROUP_MAP = {
 
 def main(context):
     config = context.config
-    logging.basicConfig(
-        format='%(asctime)s %(name)15.15s %(levelname)4.4s %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        level=logging.ERROR,
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
+
     log.setLevel(getattr(logging, config['log_level']))
 
     log.debug('config.json\n%s', pprint.pformat(config))
@@ -64,8 +59,7 @@ def main(context):
     api_uri = api_key.rsplit(':', 1)[0]
     if not api_uri.startswith('http'):
         api_uri = 'https://' + api_uri + '/api'
-    fw_api = FwApi(api_uri)
-    fw_api.headers.update({'Authorization': 'scitran-user ' + api_key})
+    fw_api = FwApi(api_uri, api_key)
 
     # validate destination project exists
     resp = fw_api.get('projects/' + config['project_id'])
@@ -77,17 +71,17 @@ def main(context):
     access_token = resp.json()['access_token']
     hc_api = HealthcareAPIClient(access_token)
 
-    with context.open_input('import_ids', 'r') as input_file:
-        import_ids = json.load(input_file)
+    with context.open_input('object_references', 'r') as input_file:
+        object_references = json.load(input_file)
 
-    if import_ids.get('dicoms'):
-        import_dicom_files(hc_api, config['hc_dicomstore'], import_ids['dicoms'], fw_api, proj, config.get('de_identify', False))
+    if object_references.get('dicoms'):
+        import_dicom_files(hc_api, config['hc_dicomstore'], object_references['dicoms'], fw_api, proj, config.get('de_identify', False))
 
-    if import_ids.get('hl7s'):
-        import_hl7_messages(hc_api, config['hc_hl7store'], import_ids['hl7s'], fw_api, proj)
+    if object_references.get('hl7s'):
+        import_hl7_messages(hc_api, config['hc_hl7store'], object_references['hl7s'], fw_api, proj)
 
-    if import_ids.get('fhirs'):
-        import_fhir_resources(hc_api, config['hc_fhirstore'], import_ids['fhirs'], fw_api, proj)
+    if object_references.get('fhirs'):
+        import_fhir_resources(hc_api, config['hc_fhirstore'], object_references['fhirs'], fw_api, proj)
 
 def import_dicom_files(hc_api, hc_dicomstore, dcm_ids, fw_api, fw_project, de_identify=False):
     log.info('Importing DICOM files...')
@@ -349,9 +343,10 @@ def metadata_encoder(obj):
 
 
 class FwApi(requests.Session):
-    def __init__(self, base_url=None, *args, **kwargs):
+    def __init__(self, base_url=None, api_key=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.base_url = base_url.rstrip('/') + '/'
+        self.headers.update({'Authorization': 'scitran-user ' + api_key})
 
     def request(self, method, url, *args, **kwargs):
         url = urljoin(self.base_url, url)

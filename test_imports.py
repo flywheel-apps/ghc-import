@@ -1,8 +1,9 @@
-import pytest
-import mock
+import base64
 import datetime
-import json
 import flywheel
+import json
+import mock
+import pytest
 
 import run
 
@@ -10,6 +11,12 @@ from io import StringIO
 
 
 PROJECT = {'group': 'scitran', 'label': 'Neuroscience'}
+
+IMPORT_IDS = {
+    'dicoms': ['1.2.840.113619.2.243.4560476901969304.96623.9313.6807608'],
+    'fhirs': ['Patient/d879d684-892a-4ba7-c4c0-9b68c481635f'],
+    'hl7s': ['sXiWf0k3rtURTkhi7144lsgfWgbP41OG-3fv5zvjLtM=']
+}
 
 HL7_MESSAGE = {
     'messageType': 'ORU',
@@ -30,7 +37,7 @@ HL7_MESSAGE = {
 
 FHIR_RESOURCE_PATIENT = {
     'resourceType': 'Patient',
-    'meta': {'lastUpdated': '2019-07-02T13:17:36.759627+00:00', 'versionId': 'MTU2McjA3MzQa18H127yNzAwMA'},
+    'meta': {'lastUpdated': '2019-07-02T13:17:36.759627+0000', 'versionId': 'MTU2McjA3MzQa18H127yNzAwMA'},
     'id': 'be3dce00-0210-4b83-8a00-d479881c821d',
     'gender': 'female',
     'birthDate': '1972-04-17',
@@ -42,7 +49,7 @@ FHIR_RESOURCE_PATIENT = {
 
 FHIR_RESOURCE_OBSERVATION = {
     'resourceType': 'Observation',
-    'meta': {'lastUpdated': '2019-07-02T13:17:37.265024+00:00', 'versionId': 'MTU2McjA3MzQa18H127yNzAwMA'},
+    'meta': {'lastUpdated': '2019-07-02T13:17:37.265024+0000', 'versionId': 'MTU2McjA3MzQa18H127yNzAwMA'},
     'id': 'fc40ec10-1b29-485d-8cef-7b211e52ebb9',
     'subject': {'reference': 'Patient/be3dce00-0210-4b83-8a00-d479881c821d'},
     'code': {'coding': [{'code': '15074-8', 'display': 'Glucose [Moles/volume] in Blood', 'system': 'http://loinc.org'}]},
@@ -97,15 +104,16 @@ def test_dicom_import(mock_get_master_subject_code, mock_get_subject_by_master_c
     mock_hc_api.get_dicomweb_client.return_value = mock_dicomweb
     mock_api = mock.Mock()
     mock_api.post.return_value = mock.Mock()
+
     with mock.patch('builtins.open', mock.mock_open(read_data=''), create=True) as mock_builtin_open:
-        run.import_dicom_files(mock_hc_api, 'hc_dicomstore', ['1.2.840.113619.2.243.4231785106118302.10626.7104.1396227'],
-                               mock_api, PROJECT)
+        run.import_dicom_files(mock_hc_api, 'hc_dicomstore', IMPORT_IDS['dicoms'], mock_api, PROJECT)
     mock_json.dumps.assert_called_once_with(list(METADATA_MAP.values())[0], default=run.metadata_encoder)
     mock_api.post.assert_called_once()
 
+@mock.patch('run.MultipartEncoder')
 @mock.patch('run.get_subject_by_master_code')
 @mock.patch('run.get_master_subject_code')
-def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_code):
+def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_code, MockMultipartEncoder):
     mock_hc_api = mock.Mock()
     msg = run.HL7Message(HL7_MESSAGE)
     assert msg
@@ -114,20 +122,33 @@ def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_cod
     mock_hc_api.get_hl7v2_message.return_value = HL7_MESSAGE
     mock_api = mock.Mock()
     mock_api.post.return_value = mock.Mock()
-    run.import_hl7_messages(mock_hc_api, 'hc_hl7store', ['id_12152782'], mock_api, PROJECT)
-    mock_hc_api.get_hl7v2_message.assert_called_once_with('hc_hl7store/messages/id_12152782')
+    run.import_hl7_messages(mock_hc_api, 'hc_hl7store', IMPORT_IDS['hl7s'], mock_api, PROJECT)
+    mock_hc_api.get_hl7v2_message.assert_called_once_with('hc_hl7store/messages/sXiWf0k3rtURTkhi7144lsgfWgbP41OG-3fv5zvjLtM=')
+    
+    # Extract fields from MultipartEncoder'a args
+    fields = MockMultipartEncoder.call_args_list[0][1]['fields']
+    assert fields['file'] == (msg.msg_control_id + '.hl7.txt', base64.b64decode(HL7_MESSAGE['data']))
+
     mock_api.post.assert_called_once()
 
+@mock.patch('run.MultipartEncoder')
 @mock.patch('run.get_subject_by_master_code')
 @mock.patch('run.get_master_subject_code')
-def test_fhir_import(mock_get_master_subject_code, mock_get_subject_by_master_code):
+def test_fhir_import(mock_get_master_subject_code, mock_get_subject_by_master_code, MockMultipartEncoder):
     mock_hc_api = mock.Mock()
     mock_hc_api.read_fhir_resource.side_effect = [FHIR_RESOURCE_OBSERVATION, FHIR_RESOURCE_PATIENT]
     mock_get_master_subject_code.return_value = 'H3B125'
     mock_get_subject_by_master_code.return_value = None
     mock_api = mock.Mock()
     mock_api.post.return_value = mock.Mock()
-    run.import_fhir_resources(mock_hc_api, 'hc_fhirstore', ['patient/12355123'], mock_api, PROJECT)
+    run.import_fhir_resources(mock_hc_api, 'hc_fhirstore', IMPORT_IDS['fhirs'], mock_api, PROJECT)
+    
+    # Extract fields and metadata from MultipartEncoder'a args
+    fields = MockMultipartEncoder.call_args_list[0][1]['fields']
+    assert fields['file'] == ('patient.fhir.json', json.dumps(FHIR_RESOURCE_OBSERVATION, sort_keys=True, 
+                                                              indent=4, default=run.metadata_encoder))
+
+
     mock_api.post.assert_called_once()
 
 @mock.patch('run.import_hl7_messages')
@@ -139,17 +160,46 @@ def test_main(MockFwApi, MockHcApi, mock_import_dicom_files, mock_import_fhir_re
     mock_context = mock.Mock()
     mock_context.configure_mock(config=CONFIG)
     mock_context.get_input.return_value = {'key': 'docker.local.flywheel.io'}
-    import_ids = {'dicoms': ['1.2.840.113619.2.243.4231785106118302.10626.7104.1396227'],
-                  'fhirs': ['patient/12355123'],
-                  'hl7s': ['id_12152782']}
-    mock_context.open_input.return_value.__enter__ = lambda *args: StringIO(json.dumps(import_ids))
+    mock_context.open_input.return_value.__enter__ = lambda *args: StringIO(json.dumps(IMPORT_IDS))
     mock_context.open_input.return_value.__exit__ = lambda *args: None
-    run.main(mock_context)
-    fw_api = MockFwApi()
+
     hc_api = MockHcApi()
-    mock_import_dicom_files.assert_called_once_with(hc_api, CONFIG['hc_dicomstore'], import_ids['dicoms'],
-                                                    fw_api, fw_api.get().json(), False)
-    mock_import_fhir_resources.assert_called_once_with(hc_api, CONFIG['hc_fhirstore'], import_ids['fhirs'],
-                                                       fw_api, fw_api.get().json())
-    mock_import_hl7_messages.assert_called_once_with(hc_api, CONFIG['hc_hl7store'], import_ids['hl7s'],
-                                                     fw_api, fw_api.get().json())
+    fw_api = MockFwApi()
+
+    def mock_fw_api_get(*args):
+        if 'projects/' + PROJECT['label'] in args:
+            return mock.Mock(json=lambda: PROJECT)
+        return fw_api
+
+    fw_api.get.side_effect = mock_fw_api_get
+
+    with mock.patch('builtins.open', mock.mock_open(read_data=''), create=True) as mock_builtin_open:
+        run.main(mock_context)
+    mock_import_dicom_files.assert_called_once_with(hc_api, CONFIG['hc_dicomstore'], IMPORT_IDS['dicoms'],
+                                                    fw_api, PROJECT, False)
+    mock_import_fhir_resources.assert_called_once_with(hc_api, CONFIG['hc_fhirstore'], IMPORT_IDS['fhirs'],
+                                                       fw_api, PROJECT)
+    mock_import_hl7_messages.assert_called_once_with(hc_api, CONFIG['hc_hl7store'], IMPORT_IDS['hl7s'],
+                                                     fw_api, PROJECT)
+
+def test_get_metadata():
+    expected_meta = {'session':
+                        {'label': 'HL7_MRN-ZEN3H_2018-07-10',
+                         'timestamp': '2018-07-10T06:54:58Z',
+                         'subject': 
+                             {'code': 'exMRN-ZEN3H',
+                              'firstname': 'Firstname',
+                              'lastname': 'Lastname',
+                              'sex': 'female',
+                              'type': 'human'
+                              }
+                        },
+                         'acquisition': 
+                             {'label': 'ORU',
+                              'timestamp': '2018-07-10T06:54:58Z'
+                             }
+                    }
+    msg = run.HL7Message(HL7_MESSAGE)
+    assert msg
+    meta = run.get_metadata(msg)
+    assert meta == expected_meta
