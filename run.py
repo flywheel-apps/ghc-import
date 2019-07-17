@@ -85,7 +85,7 @@ def main(context):
 
 def import_dicom_files(hc_api, hc_dicomstore, dcm_ids, fw_api, fw_project, de_identify=False):
     log.info('Importing DICOM files...')
-    dicomweb = hc_api.get_dicomweb_client(hc_dicomstore)
+    dicomweb =hc_api.dicomStores.dicomWeb(name=hc_dicomstore)
 
     for study_uid, series_uid in search_uids(dicomweb, dcm_ids):
         log.info('  Processing series %s', series_uid)
@@ -131,7 +131,7 @@ def import_hl7_messages(hc_api, hc_hl7store, hl7_ids, fw_api, fw_project):
     log.info('Importing HL7 messages...')
     for msg_id in hl7_ids:
         log.info('  Processing HL7 message %s', msg_id)
-        msg = hc_api.get_hl7v2_message('{}/messages/{}'.format(hc_hl7store, msg_id))
+        msg = hc_api.hl7V2Stores.messages.get(name='{}/messages/{}'.format(hc_hl7store, msg_id))
 
         log.debug('     Creating metadata...')
         msg_obj = HL7Message(msg)
@@ -182,7 +182,7 @@ def import_fhir_resources(hc_api, hc_fhirstore, fhir_refs, fw_api, fw_project):
     log.info('Importing FHIR resources...')
     for resource_ref in fhir_refs:
         resource_type, resource_id = resource_ref.split('/')
-        resource = hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(hc_fhirstore, resource_type, resource_id))
+        resource = hc_api.fhirStores.fhir.read(name='{}/fhir/{}/{}'.format(hc_fhirstore, resource_type, resource_id))
 
         log.debug('     Creating metadata...')
         resource_obj = FHIRResource(resource, hc_api, hc_fhirstore)
@@ -411,7 +411,7 @@ class FHIRResource:
             else:
                 patient_id = subject_ref.split('/')[1]
                 patient = FHIRResource(
-                    hc_api.read_fhir_resource('{}/fhir/{}/{}'.format(hc_fhirstore, 'Patient', patient_id)),
+                    hc_api.fhirStores.fhir.read(name='{}/fhir/{}/{}'.format(hc_fhirstore, 'Patient', patient_id)),
                     hc_api,
                     hc_fhirstore
                 )

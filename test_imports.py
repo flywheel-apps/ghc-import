@@ -101,7 +101,7 @@ def test_dicom_import(mock_get_master_subject_code, mock_get_subject_by_master_c
                                       '1.3.46.670589.11.0.0.11.4.2.0.12098.5.7610.1693289264174240079')]
     mock_pkg_series.return_value = METADATA_MAP
     mock_hc_api = mock.Mock()
-    mock_hc_api.get_dicomweb_client.return_value = mock_dicomweb
+    mock_hc_api.dicomStores.dicomWeb.return_value = mock_dicomweb
     mock_api = mock.Mock()
     mock_api.post.return_value = mock.Mock()
 
@@ -119,11 +119,11 @@ def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_cod
     assert msg
     mock_get_master_subject_code.return_value = 'H3B125'
     mock_get_subject_by_master_code.return_value = None
-    mock_hc_api.get_hl7v2_message.return_value = HL7_MESSAGE
+    mock_hc_api.hl7V2Stores.messages.get.return_value = HL7_MESSAGE
     mock_api = mock.Mock()
     mock_api.post.return_value = mock.Mock()
     run.import_hl7_messages(mock_hc_api, 'hc_hl7store', IMPORT_IDS['hl7s'], mock_api, PROJECT)
-    mock_hc_api.get_hl7v2_message.assert_called_once_with('hc_hl7store/messages/sXiWf0k3rtURTkhi7144lsgfWgbP41OG-3fv5zvjLtM=')
+    mock_hc_api.hl7V2Stores.messages.get.assert_called_once_with(name='hc_hl7store/messages/sXiWf0k3rtURTkhi7144lsgfWgbP41OG-3fv5zvjLtM=')
     
     # Extract fields from MultipartEncoder'a args
     fields = MockMultipartEncoder.call_args_list[0][1]['fields']
@@ -136,7 +136,7 @@ def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_cod
 @mock.patch('run.get_master_subject_code')
 def test_fhir_import(mock_get_master_subject_code, mock_get_subject_by_master_code, MockMultipartEncoder):
     mock_hc_api = mock.Mock()
-    mock_hc_api.read_fhir_resource.side_effect = [FHIR_RESOURCE_OBSERVATION, FHIR_RESOURCE_PATIENT]
+    mock_hc_api.fhirStores.fhir.read.side_effect = [FHIR_RESOURCE_OBSERVATION, FHIR_RESOURCE_PATIENT]
     mock_get_master_subject_code.return_value = 'H3B125'
     mock_get_subject_by_master_code.return_value = None
     mock_api = mock.Mock()
