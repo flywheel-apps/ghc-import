@@ -14,7 +14,7 @@ $ fw gear upload
 ```
 pip install -r requirements.txt
 pip install --no-deps dicomweb-client
-pip install -r test_requirements.txt
+pip install -r test-requirements.txt
 
 pytest test_imports.py --cov=run
 ```
