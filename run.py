@@ -4,25 +4,27 @@ import base64
 import copy
 import csv
 import datetime
-import dateutil.parser
 import flywheel
 import json
 import logging
 import os
 import pprint
-import pytz
 import re
-import requests
 import shutil
 import sys
 import tempfile
 import zipfile
-from dicomweb_client.api import load_json_dataset
+from urllib.parse import urljoin
+
 from flywheel_migration.dcm import DicomFile
 from flywheel_migration.util import DEFAULT_TZ
 from healthcare_api.client import Client as HealthcareAPIClient
+
+import dateutil.parser
+import pytz
+import requests
+from dicomweb_client.api import load_json_dataset
 from requests_toolbelt.multipart.encoder import MultipartEncoder
-from urllib.parse import urljoin
 
 log = logging.getLogger('ghc_import')
 
@@ -45,8 +47,6 @@ def main(context):
     config = context.config
 
     log.setLevel(getattr(logging, config['log_level']))
-
-    log.debug('config.json\n%s', pprint.pformat(config))
 
     api_key = context.get_input('key')['key']
 

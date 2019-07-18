@@ -1,6 +1,5 @@
 import base64
 import datetime
-import flywheel
 import json
 import mock
 import pytest
