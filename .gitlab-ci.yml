@@ -1,8 +1,7 @@
-services:
-  - shell-runner
-
 test:
   stage: test
+  tags:
+    - shell-runner
   script:
     - pip install -r requirements.txt
     - pip install --no-deps dicomweb-client
