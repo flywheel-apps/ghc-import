@@ -9,9 +9,7 @@ import json
 import logging
 import os
 import pprint
-import re
 import shutil
-import sys
 import tempfile
 import zipfile
 from urllib.parse import urljoin
