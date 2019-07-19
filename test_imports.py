@@ -124,7 +124,7 @@ def test_hl7_import(mock_get_master_subject_code, mock_get_subject_by_master_cod
     run.import_hl7_messages(mock_hc_api, 'hc_hl7store', IMPORT_IDS['hl7s'], mock_api, PROJECT)
     mock_hc_api.hl7V2Stores.messages.get.assert_called_once_with(name='hc_hl7store/messages/sXiWf0k3rtURTkhi7144lsgfWgbP41OG-3fv5zvjLtM=')
     
-    # Extract fields from MultipartEncoder'a args
+    # Extract fields from MultipartEncoder's args
     fields = MockMultipartEncoder.call_args_list[0][1]['fields']
     assert fields['file'] == (msg.msg_control_id + '.hl7.txt', base64.b64decode(HL7_MESSAGE['data']))
 
@@ -142,7 +142,7 @@ def test_fhir_import(mock_get_master_subject_code, mock_get_subject_by_master_co
     mock_api.post.return_value = mock.Mock()
     run.import_fhir_resources(mock_hc_api, 'hc_fhirstore', IMPORT_IDS['fhirs'], mock_api, PROJECT)
     
-    # Extract fields and metadata from MultipartEncoder'a args
+    # Extract fields and metadata from MultipartEncoder's args
     fields = MockMultipartEncoder.call_args_list[0][1]['fields']
     assert fields['file'] == ('patient.fhir.json', json.dumps(FHIR_RESOURCE_OBSERVATION, sort_keys=True, 
                                                               indent=4, default=run.metadata_encoder))
