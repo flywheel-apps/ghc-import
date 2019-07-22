@@ -14,15 +14,15 @@ import tempfile
 import zipfile
 from urllib.parse import urljoin
 
-from flywheel_migration.dcm import DicomFile
-from flywheel_migration.util import DEFAULT_TZ
-from healthcare_api.client import Client as HealthcareAPIClient
-
 import dateutil.parser
 import pytz
 import requests
 from dicomweb_client.api import load_json_dataset
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+from flywheel_migration.dcm import DicomFile
+from flywheel_migration.util import DEFAULT_TZ
+from healthcare_api.client import Client as HealthcareAPIClient
 
 log = logging.getLogger('ghc_import')
 

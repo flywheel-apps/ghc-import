@@ -3,10 +3,9 @@ import datetime
 import json
 import mock
 import pytest
+from io import StringIO
 
 import run
-
-from io import StringIO
 
 
 PROJECT = {'group': 'scitran', 'label': 'Neuroscience'}
