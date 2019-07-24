@@ -1,21 +1,12 @@
-FROM python:2.7-alpine3.7
+FROM python:3.7.4-alpine3.10
 
-ENV GEAR_BASE_DIR=/flywheel/v0
-ENV GEAR_INPUT_DIR="${GEAR_BASE_DIR}/input" \
-    GEAR_OUTPUT_DIR="${GEAR_BASE_DIR}/output" \
-    GEAR_MANIFEST_FILE="${GEAR_BASE_DIR}/manifest.json" \
-    GEAR_ENTRYPOINT="${GEAR_BASE_DIR}/run"
+RUN apk add --no-cache bash git
 
-RUN apk add --no-cache git bash build-base python-dev py-pip jpeg-dev zlib-dev \
-    && mkdir -p "${GEAR_INPUT_DIR}" \
-    && mkdir -p "${GEAR_OUTPUT_DIR}"
+WORKDIR /flywheel/v0
+COPY requirements.txt requirements.txt
+RUN pip3 install -r requirements.txt \
+    && pip3 install --no-deps dicomweb-client
 
-# install requirements
-COPY requirements.txt "${GEAR_BASE_DIR}/requirements.txt"
-RUN pip install -r "${GEAR_BASE_DIR}/requirements.txt"
+COPY . .
 
-COPY manifest.json "${GEAR_MANIFEST_FILE}"
-COPY run.sh "${GEAR_ENTRYPOINT}"
-COPY script.py "${GEAR_BASE_DIR}/script.py"
-
-WORKDIR ${GEAR_BASE_DIR}
+CMD ["/flywheel/v0/run.py"]
