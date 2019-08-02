@@ -2,7 +2,7 @@
 	"name": "ghc-import",
 	"label": "GHC import",
 	"description": "Import DICOMs from Google Healthcare API",
-	"version": "0.5.1",
+	"version": "0.6.0",
 	"flywheel": "0",
 	"inputs": {
 		"object_references": {
@@ -42,6 +42,16 @@
 			"default": "",
 			"description": "Healthcare API HL7 store",
 			"type": "string"
+		},
+		"hc_annotationstore": {
+			"default": "",
+			"description": "Healthcare API Annotaions store",
+			"type": "string"
+		},
+		"import_dicom_annotations": {
+			"default": false,
+			"description": "Import Image annotations that refer to a DICOM instance",
+			"type": "boolean"
 		},
 		"log_level": {
 			"default": "INFO",
