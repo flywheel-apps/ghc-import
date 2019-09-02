@@ -5,3 +5,4 @@
 !requirements.txt
 !run.py
 !test-requirements.txt
+!Pipfile*

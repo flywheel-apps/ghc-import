@@ -7,4 +7,3 @@ pyyaml
 requests
 requests-toolbelt
 tzlocal
-git+https://github.com/flywheel-io/healthcare-api@develop

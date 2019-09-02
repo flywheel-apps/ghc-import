@@ -1,0 +1,22 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pylint = "*"
+rope = "*"
+autopep8 = "*"
+pydocstyle = "*"
+flake8 = "*"
+
+[packages]
+backports-tempfile = "*"
+flywheel-migration = "*"
+requests-toolbelt = "*"
+tzlocal = "*"
+flywheel-sdk = "*"
+flywheel-healthcare-api = "*"
+
+[requires]
+python_version = "3.7"

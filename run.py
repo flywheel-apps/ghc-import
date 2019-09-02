@@ -16,11 +16,12 @@ import dateutil.parser
 import flywheel
 import flywheel.rest
 import pytz
-from dicomweb_client.api import load_json_dataset
 from flywheel.file_spec import FileSpec
 from flywheel_migration.dcm import DicomFile
 from flywheel_migration.util import DEFAULT_TZ
-from healthcare_api.client import Client as HealthcareAPIClient
+
+from dicomweb_client.api import load_json_dataset
+from flywheel_healthcare_api.client import Client as HealthcareAPIClient
 
 logging.basicConfig(
     level=logging.ERROR,
@@ -44,14 +45,6 @@ HL7_ETHNIC_GROUP_MAP = {
 def main(context):
     config = context.config
     log.setLevel(getattr(logging, config['log_level']))
-
-    api_key = context.get_input('key')['key']
-    if 'docker.local.flywheel.io' in api_key:
-        # dev workaround for accessing docker.local - set own host ip
-        # ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'
-        host_ip = '192.168.50.148'
-        with open('/etc/hosts', 'a') as f:
-            f.write(host_ip + '\tdocker.local.flywheel.io\n')
 
     with context.open_input('object_references', 'r') as input_file:
         object_references = json.load(input_file)
@@ -696,8 +689,22 @@ def find_annotations_for_instances(annotations, sop_instance_uids):
     return filtered_annotations
 
 
+def enable_docker_local_access(context):
+    """Enable accessing docker.local.flywheel.io within a gear (ie. in development)"""
+    if 'docker.local.flywheel.io' in context.get_input('key').get('key', ''):
+        if os.path.exists('docker_host'):
+            docker_host = open('docker_host').read().strip()
+            with open('/etc/hosts', 'a') as hosts:
+                hosts.write(docker_host + '\tdocker.local.flywheel.io\n')
+        else:
+            cmd = "ip -o route get to 8.8.8.8 | sed 's/^.*src \([^ ]*\).*$/\1/;q' > docker_host"
+            log.warning('cannot patch /etc/hosts with docker.local.flywheel.io - docker_host file not found. '
+                        "Run the following command to create the file in your gear's root dir: \n%s", cmd)
+
+
 if __name__ == '__main__':
     with flywheel.GearContext() as context:
+        enable_docker_local_access(context)
         context.init_logging()
         context.log_config()
         main(context)
