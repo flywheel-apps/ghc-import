@@ -1,8 +1,7 @@
 import datetime
 import json
 from io import StringIO
-
-import mock
+from unittest import mock
 
 import run
 

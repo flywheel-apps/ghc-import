@@ -1,9 +1,0 @@
-backports.tempfile
-flywheel-migration
-flywheel-sdk
-pydicom
-pytz
-pyyaml
-requests
-requests-toolbelt
-tzlocal

@@ -9,6 +9,8 @@ rope = "*"
 autopep8 = "*"
 pydocstyle = "*"
 flake8 = "*"
+pytest = "*"
+pytest-cov = "*"
 
 [packages]
 backports-tempfile = "*"
