@@ -5,5 +5,5 @@ test:
   script:
     - pip install pipenv
     - pip install --no-deps dicomweb-client
-    - pipenv install --system
+    - pipenv install --dev --system
     - python -m pytest test_imports.py --cov=run
